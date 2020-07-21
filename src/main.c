@@ -91,7 +91,7 @@ process(
             if (output == NULL)
                 die(PNGMETA_NAME ": Unable to open output file '%s'\n", outfile);
 
-            long newfsize = 0;
+            int newfsize = 0;
             if (exclusive)
             {
                 newbuf = rpng_chunk_remove_from_memory(buffer, "tEXt", &newfsize);
@@ -159,7 +159,7 @@ process(
 
         case PNGMETA_OP_REMOVE_TEXT:
         {
-            long count = 0;
+            int count = 0;
             rpng_chunk* chunks = rpng_chunk_read_all_from_memory(buffer, &count);
             free(buffer);
             if (count == 0 || chunks == NULL)
@@ -328,8 +328,8 @@ main(int argc, char* argv[])
             if (outfile == NULL)
                 die(PNGMETA_NAME ": Unable to allocate %d bytes for creating string\n", ifnlen + outdirlen + 1);
 
-            strncpy(outfile, outdir, outdirlen);
-            strncpy(outfile + outdirlen, infilename, ifnlen);
+            memcpy(outfile, outdir, outdirlen);
+            memcpy(outfile + outdirlen, infilename, ifnlen);
             outfile[outdirlen + ifnlen + 1] = '\0';
         }
         else

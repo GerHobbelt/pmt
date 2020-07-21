@@ -50,7 +50,7 @@ char* custom_strdup(char* str)
 {
 	int slen = strlen(str);
 	char* outstr = malloc((slen + 1) * sizeof(char));
-	strncpy(outstr, str, slen);
+	memcpy(outstr, str, slen);
 	outstr[slen] = '\0';
 	return outstr;
 }
