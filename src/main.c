@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_DEPRECATE
+
 #define RPNG_IMPLEMENTATION
 #include "rpng.h"
 
@@ -17,10 +19,10 @@ briefusage(bool usageonly)
         " [-d OUTDIR]"
         " [-e] [--human]"
         " [--chunk CHUNKIDX]"
-        " FILE1 FILE2 ...\n ");
+        " FILE1 FILE2 ...\n");
     if (!usageonly)
     {
-        printf(PNGMETA_NAME ": No mode specified.");
+        printf(PNGMETA_NAME ": No mode or file specified.");
         exit(EXIT_FAILURE);
     }
 }
@@ -51,7 +53,7 @@ process(
     char* infile, char* outfile,
     enum PNGMETA_OP op,
     char* key, char* text,
-    int* selchunks, int selchunk,
+    int* selchunks, int selchunkidx,
     bool exclusive, bool human)
 {
     FILE* f = fopen(infile, "rb");
@@ -61,7 +63,6 @@ process(
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
-
     unsigned char* buffer = NULL;
     buffer = malloc(fsize * sizeof(unsigned char));
     if (buffer == NULL)
@@ -117,6 +118,7 @@ process(
         {
             int count = 0;
             rpng_chunk* chunks = rpng_chunk_read_all_from_memory(buffer, &count);
+            free(buffer);
             if (count == 0 || chunks == NULL)
                 die(PNGMETA_NAME ": Unable to read chunks from file '%s'\n", infile);
 
@@ -140,8 +142,11 @@ process(
                         printf("Chunk %d of %d (%d bytes): %s: %s\n", i + 1, count, chunks[i].length, chunk, chunk + keysize + 1);
                     else
                         printf("%d %d %d %s %s\n", i, count, chunks[i].length, chunk, chunk + keysize + 1);
-                    free(chunk);
-                    free(chunks[i].data);
+                    // if chunk == chunks[].data, then the pointer hasn't been changed, so we avoid double free
+                    if (chunk != chunks[i].data)
+                        free(chunks[i].data);
+                    else
+                        free(chunk);
                 }
                 else {
                     free(chunks[i].data);
@@ -156,6 +161,7 @@ process(
         {
             long count = 0;
             rpng_chunk* chunks = rpng_chunk_read_all_from_memory(buffer, &count);
+            free(buffer);
             if (count == 0 || chunks == NULL)
                 die(PNGMETA_NAME ": Unable to read chunks from file '%s'\n", infile);
 
@@ -168,22 +174,22 @@ process(
             memcpy(newbuf, png_signature, 8);
             newbufsize += 8;
 
+            int idx = 0;
             for (int i = 0; i < count; i++)
             {
-                for (int j = 0; j <= selchunk; j++)
+                // if it is not the chunk we want, copy it to output
+                if (i != selchunks[idx])
                 {
-                    // if it is not the chunk we want, copy it to output
-                    if (i != selchunks[j])
-                    {
-                        unsigned int belength = endianswap(chunks[i].length);
-                        unsigned int becrc = endianswap(chunks[i].crc);
-                        memcpy(newbuf + newbufsize, &belength, 4);
-                        memcpy(newbuf + newbufsize + 4, chunks[i].type, 4);
-                        memcpy(newbuf + newbufsize + 8, chunks[i].data, chunks[i].length);
-                        memcpy(newbuf + newbufsize + 8 + chunks[i].length, &becrc, 4);
-                        newbufsize += (8 + chunks[i].length + 4);
-                    }
+                    unsigned int belength = endianswap(chunks[i].length);
+                    unsigned int becrc = endianswap(chunks[i].crc);
+                    memcpy(newbuf + newbufsize, &belength, 4);
+                    memcpy(newbuf + newbufsize + 4, chunks[i].type, 4);
+                    memcpy(newbuf + newbufsize + 8, chunks[i].data, chunks[i].length);
+                    memcpy(newbuf + newbufsize + 8 + chunks[i].length, &becrc, 4);
+                    newbufsize += (8 + chunks[i].length + 4);
                 }
+                else
+                    idx++;
                 free(chunks[i].data);
             }
 
@@ -195,7 +201,6 @@ process(
             free(newbuf);
         }
     }
-    if (buffer != NULL) free(buffer);
 }
 
 int
@@ -266,7 +271,9 @@ main(int argc, char* argv[])
             png_op = PNGMETA_OP_REMOVE_TEXT;
             break;
         case 'h':
-            usage();
+            // this is the limit of argv.h, it cannot differentiate between -h and --human
+            if (option && strcmp(option, "human") != 0)
+                usage();
             break;
         case 'k':
             key = GETS();
@@ -302,13 +309,10 @@ main(int argc, char* argv[])
     } ARGEND
 
 
-    if (png_op == PNGMETA_OP_NONE)
-        briefusage(true);
+    if (png_op == PNGMETA_OP_NONE || !argc)
+        briefusage(false);
     if (png_op == PNGMETA_OP_ADD_TEXT && (text == NULL || key == NULL))
-        die(PNGMETA_NAME ": no text specified.\n");
-
-    if (!argc)
-        briefusage(true);
+        die(PNGMETA_NAME ": no key or text specified.\n");
 
     for (int i = 0; i < argc; i++)
     {
