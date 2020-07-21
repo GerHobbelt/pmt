@@ -101,8 +101,8 @@
     <ClCompile Include="src\main.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\argv.h" />
     <ClInclude Include="src\rpng.h" />
-    <ClInclude Include="src\simple-opt.h" />
     <ClInclude Include="src\util.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

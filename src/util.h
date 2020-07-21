@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define die(...) { fprintf(stderr, __VA_ARGS__); exit(EXIT_FAILURE); }
-#define ARRAY_INITIAL_SIZE 5
+#define PNGMETA_NAME "pngmeta"
 
 enum PNGMETA_OP {
 	PNGMETA_OP_NONE,
@@ -51,5 +51,18 @@ char* custom_strdup(char* str)
 	strncpy(outstr, str, slen);
 	outstr[slen] = '\0';
 	return outstr;
+}
+
+int strtol_or_die(char* str)
+{
+	char* endptr;
+	errno = 0;
+	int number = strtol(str, &endptr, 0);
+
+	if (endptr == str || *endptr != '\0' ||
+		((number == LONG_MIN || number == LONG_MAX) && errno == ERANGE))
+		die(PNGMETA_NAME ": Unable to parse option '%s' as a number\n", str);
+	
+	return number;
 }
 #endif
