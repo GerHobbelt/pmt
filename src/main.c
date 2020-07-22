@@ -22,7 +22,7 @@ briefusage(bool usageonly)
         " FILE1 FILE2 ...\n");
     if (!usageonly)
     {
-        printf(PNGMETA_NAME ": No mode or file specified.");
+        printf(PNGMETA_NAME ": No mode or file specified.\n");
         exit(EXIT_FAILURE);
     }
 }
