@@ -134,19 +134,13 @@ process(
                     }
                     // realloc the buffer with 1 more byte to fit the EOF
                     int keysize = delim - chunks[i].data;
-                    int valsize = chunks[i].length - keysize;
+                    int valsize = chunks[i].length - keysize - 1;
 
-                    unsigned char* chunk = realloc(chunks[i].data, (chunks[i].length + 1) * sizeof(unsigned char));
-                    chunk[chunks[i].length] = '\0';
                     if (human)
-                        printf("Chunk %d of %d (%d bytes): %s: %s\n", i + 1, count, chunks[i].length, chunk, chunk + keysize + 1);
+                        printf("Chunk %d of %d (%d bytes): %s: %.*s\n", i + 1, count, chunks[i].length, chunks[i].data, valsize, chunks[i].data + keysize + 1);
                     else
-                        printf("%d %d %d %s %s\n", i, count, chunks[i].length, chunk, chunk + keysize + 1);
-                    // if chunk == chunks[].data, then the pointer hasn't been changed, so we avoid double free
-                    if (chunk != chunks[i].data)
-                        free(chunks[i].data);
-                    else
-                        free(chunk);
+                        printf("%d %d %d %s %.*s\n", i, count, chunks[i].length, chunks[i].data, valsize, chunks[i].data + keysize + 1);
+                    free(chunks[i].data);
                 }
                 else {
                     free(chunks[i].data);
