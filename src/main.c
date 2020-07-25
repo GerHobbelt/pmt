@@ -109,7 +109,7 @@ process(
                 free(newbuf);
             }
 
-            printf("Done adding text chunk to '%s'\n", outfile);
+            printf("success: Done adding text chunk to '%s'\n", outfile);
             fclose(output);
             break;
         }
@@ -121,7 +121,8 @@ process(
             free(buffer);
             if (count == 0 || chunks == NULL)
                 die(PNGMETA_NAME ": Unable to read chunks from file '%s'\n", infile);
-
+            
+            printf("file: %s\n", infile);
             for (int i = 0; i < count; i++)
             {
                 if (strncmp(chunks[i].type, "tEXt", 4) == 0) {
@@ -137,9 +138,9 @@ process(
                     int valsize = chunks[i].length - keysize - 1;
 
                     if (human)
-                        printf("Chunk %d of %d (%d bytes): %s: %.*s\n", i + 1, count, chunks[i].length, chunks[i].data, valsize, chunks[i].data + keysize + 1);
+                        printf("chunk: %d of %d (%d bytes): %s: %.*s\n", i + 1, count, chunks[i].length, chunks[i].data, valsize, chunks[i].data + keysize + 1);
                     else
-                        printf("%d %d %d %s %.*s\n", i, count, chunks[i].length, chunks[i].data, valsize, chunks[i].data + keysize + 1);
+                        printf("chunk: %d %d %d %s %.*s\n", i, count, chunks[i].length, chunks[i].data, valsize, chunks[i].data + keysize + 1);
                     free(chunks[i].data);
                 }
                 else {
@@ -191,6 +192,8 @@ process(
             if (output == NULL)
                 die(PNGMETA_NAME ": Unable to open output file '%s'\n", outfile);
             fwrite(newbuf, sizeof(unsigned char), newbufsize, output);
+
+            printf("success: Removed chunk(s) from '%s'\n", outfile);
             fclose(output);
             free(newbuf);
         }
