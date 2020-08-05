@@ -35,8 +35,8 @@ int png_add_chunk(unsigned char* buffer, int size, png_chunk *chunks, int chunks
 int png_remove_chunk(unsigned char* buffer, int size, int* chunks, int chunksize);
 int png_remove_chunk_by_type(unsigned char* buffer, int size, char** type, int typesize);
 
-unsigned int swap_endian(unsigned int value);
-unsigned int crc32(unsigned char* buffer, int size);
+static unsigned int swap_endian(unsigned int value);
+static unsigned int crc32(unsigned char* buffer, int size);
 
 // IMPLEMENTATION
 png_result
