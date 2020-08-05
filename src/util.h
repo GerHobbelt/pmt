@@ -62,7 +62,7 @@ int strtol_or_die(char* str)
 	int number = strtol(str, &endptr, 0);
 
 	if (endptr == str || *endptr != '\0' ||
-		((number == LONG_MIN || number == LONG_MAX) && errno == ERANGE))
+		(errno == ERANGE))
 		die(PNGMETA_NAME ": Unable to parse option '%s' as a number\n", str);
 	
 	return number;
