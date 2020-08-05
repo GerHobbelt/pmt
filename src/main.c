@@ -126,7 +126,7 @@ process(
             png_result res = 0;
             while ((res = png_parser_next(&state, &chunk)) != PNG_END)
             {
-                if (strncmp(chunk.type, "tEXt", 4) == 0) {
+                if (strncmp((const char*)chunk.type, "tEXt", 4) == 0) {
                     unsigned char* delim = memchr(chunk.data, '\0', chunk.length);
                     if (delim == NULL)
                     {
