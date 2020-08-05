@@ -66,7 +66,7 @@ process(
     unsigned char* buffer = NULL;
     buffer = malloc(fsize * sizeof(unsigned char));
     if (buffer == NULL)
-        die(PNGMETA_NAME ": Failed to allocate %d bytes for reading png file\n", fsize);
+        die(PNGMETA_NAME ": Failed to allocate %ld bytes for reading png file\n", fsize);
 
     fread(buffer, sizeof(unsigned char), fsize, f);
     fclose(f);
