@@ -49,7 +49,7 @@ usage()
 }
 
 static void
-process(
+_process(
     char* infile, char* outfile,
     enum PNGMETA_OP op,
     char* key, char* text,
@@ -171,7 +171,7 @@ process(
 int
 main(int argc, char* argv[])
 {
-    char* infile = NULL;
+    char* _infile = NULL;
     char* outdir = NULL;
     char* key = NULL;
     char* text = NULL;
