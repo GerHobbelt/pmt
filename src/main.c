@@ -161,6 +161,10 @@ process(
             fclose(output);
             break;
         }
+		case PNGMETA_OP_NONE:
+		{
+			// TODO: Do todo
+		}
     }
 }
 
