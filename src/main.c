@@ -49,7 +49,7 @@ usage()
 }
 
 static void
-process(
+_process(
     char* infile, char* outfile,
     enum PNGMETA_OP op,
     char* key, char* text,
@@ -66,7 +66,7 @@ process(
     unsigned char* buffer = NULL;
     buffer = malloc(fsize * sizeof(unsigned char));
     if (buffer == NULL)
-        die(PNGMETA_NAME ": Failed to allocate %d bytes for reading png file\n", fsize);
+        die(PNGMETA_NAME ": Failed to allocate %ld bytes for reading png file\n", fsize);
 
     fread(buffer, sizeof(unsigned char), fsize, f);
     fclose(f);
@@ -126,7 +126,7 @@ process(
             png_result res = 0;
             while ((res = png_parser_next(&state, &chunk)) != PNG_END)
             {
-                if (strncmp(chunk.type, "tEXt", 4) == 0) {
+                if (strncmp((const char*)chunk.type, "tEXt", 4) == 0) {
                     unsigned char* delim = memchr(chunk.data, '\0', chunk.length);
                     if (delim == NULL)
                     {
@@ -161,13 +161,17 @@ process(
             fclose(output);
             break;
         }
+		case PNGMETA_OP_NONE:
+		{
+			// TODO: Do todo
+		}
     }
 }
 
 int
 main(int argc, char* argv[])
 {
-    char* infile = NULL;
+    char* _infile = NULL;
     char* outdir = NULL;
     char* key = NULL;
     char* text = NULL;
@@ -315,4 +319,4 @@ main(int argc, char* argv[])
     */
 
     free(chunks);
-}
+}}

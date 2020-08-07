@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 typedef struct png_state {
 	unsigned char* ptr;
@@ -34,8 +35,8 @@ int png_add_chunk(unsigned char* buffer, int size, png_chunk *chunks, int chunks
 int png_remove_chunk(unsigned char* buffer, int size, int* chunks, int chunksize);
 int png_remove_chunk_by_type(unsigned char* buffer, int size, char** type, int typesize);
 
-unsigned int swap_endian(unsigned int value);
-unsigned int crc32(unsigned char* buffer, int size);
+static unsigned int swap_endian(unsigned int value);
+static unsigned int crc32(unsigned char* buffer, int size);
 
 // IMPLEMENTATION
 png_result
@@ -125,11 +126,11 @@ png_add_chunk(unsigned char* buffer, int size, png_chunk* chunks, int chunksize)
 			// write our chunks here
 			for (int i = 0, j = 0; i < chunksize; i++)
 			{
-				memcpy(chunkstart + j, (void *) swap_endian(chunks[i].length), 4);
+				memcpy(chunkstart + j, (void *)(u_int64_t) swap_endian(chunks[i].length), 4);
 				memcpy(chunkstart + j + 4, chunks[i].type, 4);
 				memcpy(chunkstart + j + 8, chunks[i].data, chunks[i].length);
 				unsigned int crc = crc32(chunkstart + j + 4, chunks[i].length + 4);
-				memcpy(chunkstart + j + 8 + chunks[i].length, (void*) swap_endian(crc), 4);
+				memcpy(chunkstart + j + 8 + chunks[i].length, (void*)(u_int64_t) swap_endian(crc), 4);
 				j += (4 + 4 + chunks[i].length + 4);
 			}
 			break; // in theory we don't need to loop anymore.
