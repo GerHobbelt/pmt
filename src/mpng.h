@@ -1,13 +1,21 @@
+/*
+mpng.h - Zero-allocation-eqsue png chunk parser.
+Tries to not allocate memory, returning pointers to data passed in. Only reallocations allowed.
+Dual licensed under MIT-0 or Unlicense. See end of file for license.
+
+Kelvin Voon <takase1121@outlook.com>
+*/
+
 #ifndef __MPNG_H__
 #define __MPNG_H__
 
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
+#include <stdint.h>
 
 typedef struct png_state {
 	unsigned char* ptr;
-	int idx;
+	int read;
 	int size;
 	int count;
 } png_state;
@@ -27,18 +35,24 @@ typedef enum {
 	PNG_NEED_MORE
 } png_result;
 
-const char png_header[] = { 137, 80, 78, 71, 13, 10, 26, 10 };
 
-png_result png_parser_create(png_state* state, unsigned char* buffer, int size);
-png_result png_parser_next(png_state* state, png_chunk* chunk);
-int png_add_chunk(unsigned char* buffer, int size, png_chunk *chunks, int chunksize);
-int png_remove_chunk(unsigned char* buffer, int size, int* chunks, int chunksize);
+// High level API
+int png_add_chunks(unsigned char* buffer, int size, png_chunk* chunks, int chunksize);
+int png_add_text_chunks(unsigned char* buffer, int size, char** kv, int kvsize);
+int png_remove_chunks(unsigned char* buffer, int size, int* chunks, int chunksize);
 int png_remove_chunk_by_type(unsigned char* buffer, int size, char** type, int typesize);
 
-static unsigned int swap_endian(unsigned int value);
-static unsigned int crc32(unsigned char* buffer, int size);
+// Lower-level API
+png_result png_parser_create(png_state* state, unsigned char* buffer, int size);
+png_result png_parser_next(png_state* state, png_chunk* chunk);
+
+// others
+static uint32_t swap_endian(unsigned int value);
+static uint32_t crc32(unsigned char* buffer, int size);
 
 // IMPLEMENTATION
+const char png_header[] = { 137, 80, 78, 71, 13, 10, 26, 10 };
+
 png_result
 png_parser_create(png_state* state, unsigned char* buffer, int size)
 {
@@ -47,7 +61,7 @@ png_parser_create(png_state* state, unsigned char* buffer, int size)
 	if (memcmp(buffer, png_header, 8) != 0)
 		return PNG_INVALID_HEADER;
 	state->ptr = buffer;
-	state->idx = 8;
+	state->read = 8;
 	state->size = size;
 	state->count = 0;
 
@@ -58,21 +72,21 @@ png_result
 png_parser_next(png_state* state, png_chunk* chunk)
 {
 	// not enough data for length and type
-	if ((state->idx + 8) > state->size)
+	if ((state->read + 8) > state->size)
 		return PNG_NEED_MORE;
-	chunk->length = swap_endian(((unsigned int*) (state->ptr + state->idx))[0]);
-	memcpy(chunk->type, state->ptr + state->idx + 4, 4);
+	chunk->length = swap_endian(((uint32_t*) (state->ptr + state->read))[0]);
+	memcpy(chunk->type, state->ptr + state->read + 4, 4);
 
 	// check if we have enough data for chunk data and crc
-	if ((state->idx + 4 + 4 + chunk->length + 4) > state->size)
+	if ((state->read + 4 + 4 + chunk->length + 4) > state->size)
 		return PNG_NEED_MORE;
-	chunk->data = state->ptr + state->idx + 4 + 4;
-	chunk->crc = swap_endian(((unsigned int*) (state->ptr + state->idx + 4 + 4 + chunk->length))[0]);
-	unsigned int realcrc = crc32(state->ptr + state->idx + 4, chunk->length + 4);
+	chunk->data = state->ptr + state->read + 4 + 4;
+	chunk->crc = swap_endian(((uint32_t*) (state->ptr + state->read + 4 + 4 + chunk->length))[0]);
+	unsigned int realcrc = crc32(state->ptr + state->read + 4, chunk->length + 4);
 	if (chunk->crc != realcrc)
 		return PNG_INVALID_CRC;
 
-	state->idx += (4 + 4 + chunk->length + 4);
+	state->read += (4 + 4 + chunk->length + 4);
 	state->count++;
 
 	if (memcmp(chunk->type, "IEND", 4) == 0)
@@ -84,7 +98,7 @@ png_parser_next(png_state* state, png_chunk* chunk)
 }
 
 int
-png_add_chunk(unsigned char* buffer, int size, png_chunk* chunks, int chunksize)
+png_add_chunks(unsigned char* buffer, int size, png_chunk* chunks, int chunksize)
 {
 	png_state state = { 0 };
 	png_chunk chunk = { 0 };
@@ -121,16 +135,17 @@ png_add_chunk(unsigned char* buffer, int size, png_chunk* chunks, int chunksize)
 			// chunk data is exactly 8 bytes behind the start of a block.
 			unsigned char* chunkstart = chunk.data - 8;
 			// move everything backwards.
-			int mvsize = size - state.idx;
-			memmove(chunkstart, chunkstart + add_chunksize, mvsize);
+			int mvsize = size - (chunkstart - buffer); // chunkstart - buffer = bytes read
+			memmove(chunkstart + add_chunksize, chunkstart, mvsize);
 			// write our chunks here
 			for (int i = 0, j = 0; i < chunksize; i++)
 			{
-				memcpy(chunkstart + j, (void *)(u_int64_t) swap_endian(chunks[i].length), 4);
+				uint32_t clen = swap_endian(chunks[i].length);
+				memcpy(chunkstart + j, (void *) &clen, 4);
 				memcpy(chunkstart + j + 4, chunks[i].type, 4);
 				memcpy(chunkstart + j + 8, chunks[i].data, chunks[i].length);
-				unsigned int crc = crc32(chunkstart + j + 4, chunks[i].length + 4);
-				memcpy(chunkstart + j + 8 + chunks[i].length, (void*)(u_int64_t) swap_endian(crc), 4);
+				uint32_t crc = swap_endian(crc32(chunkstart + j + 4, chunks[i].length + 4));
+				memcpy(chunkstart + j + 8 + chunks[i].length, (void*) &crc, 4);
 				j += (4 + 4 + chunks[i].length + 4);
 			}
 			break; // in theory we don't need to loop anymore.
@@ -140,8 +155,80 @@ png_add_chunk(unsigned char* buffer, int size, png_chunk* chunks, int chunksize)
 	return size + add_chunksize;
 }
 
+int 
+png_add_text_chunks(unsigned char* buffer, int size, char** kv, int kvsize)
+{
+	png_state state = { 0 };
+	png_chunk chunk = { 0 };
+	if (png_parser_create(&state, buffer, size) != PNG_OK)
+		return size;
+
+
+	// calculate how much space will text chunks take.
+	int add_chunksize = 0;
+
+	for (int i = 0; i < kvsize; i += 2)
+	{
+		add_chunksize += (4 + 4 + strlen(kv[i]) + 1 + strlen(kv[i + 1]) + 4);
+	}
+
+	// realloc enough space for new buffer
+	unsigned char* newbuf = (unsigned char*)realloc(buffer, size + add_chunksize);
+	if (newbuf == NULL)
+		return size;
+
+	// load the chunks
+	int passed_ihdr = 0;
+	for (png_result res = png_parser_next(&state, &chunk);
+		res < 2; // >1 are errors
+		res = png_parser_next(&state, &chunk))
+	{
+		if (memcmp(chunk.type, "IHDR", 4) == 0)
+		{
+			passed_ihdr = 1;
+			continue;
+		}
+
+		if (passed_ihdr)
+		{
+			// chunk data is exactly 8 bytes behind the start of a block.
+			unsigned char* chunkstart = chunk.data - 8;
+			// move everything backwards.
+			int mvsize = size - (chunkstart - buffer); // chunkstart - buffer = bytes read
+			memmove(chunkstart + add_chunksize, chunkstart, mvsize);
+			// write our chunks here
+			int offset = 0;
+			for (int i = 0; i < kvsize; i += 2)
+			{
+				int klen = strlen(kv[i]) + 1;
+				int vlen = strlen(kv[i + 1]);
+				
+				// length
+				uint32_t clen = swap_endian(klen + vlen);
+				memcpy(chunkstart + offset, (void*)&clen, 4);
+				
+				// chunk type
+				memcpy(chunkstart + offset + 4, "tEXt", 4);
+				
+				// keyword and value
+				memcpy(chunkstart + offset + 8, kv[i], klen);
+				memcpy(chunkstart + offset + 8 + klen, kv[i + 1], vlen);
+
+				// crc
+				uint32_t crc = swap_endian(crc32(chunkstart + offset + 4, 4 + klen + vlen));
+				memcpy(chunkstart + offset + 8 + klen + vlen, (void*)&crc, 4);
+
+				offset += (4 + 4 + klen + vlen + 4);
+			}
+			break; // in theory we don't need to loop anymore.
+		}
+	}
+
+	return size + add_chunksize;
+}
+
 int
-png_remove_chunk(unsigned char* buffer, int size, int* chunks, int chunksize)
+png_remove_chunks(unsigned char* buffer, int size, int* chunks, int chunksize)
 {
 	png_state state = { 0 };
 	png_chunk chunk = { 0 };
@@ -159,7 +246,7 @@ png_remove_chunk(unsigned char* buffer, int size, int* chunks, int chunksize)
 		if (mvptr != NULL)
 		{
 			unsigned char* chunkstart = chunk.data - 8;
-			int mvsize = size - state.idx;
+			int mvsize = size - state.read;
 			memmove(mvptr, chunkstart, mvsize);
 			state.size -= (4 + 4 + chunk.length + 4);
 			newsize = state.size;
@@ -197,7 +284,7 @@ png_remove_chunk_by_type(unsigned char* buffer, int size, char** type, int types
 		if (mvptr != NULL)
 		{
 			unsigned char* chunkstart = chunk.data - 8;
-			int mvsize = size - state.idx;
+			int mvsize = size - state.read;
 			memmove(mvptr, chunkstart, mvsize);
 			state.size -= (4 + 4 + chunk.length + 4);
 			newsize = state.size;
@@ -216,7 +303,7 @@ png_remove_chunk_by_type(unsigned char* buffer, int size, char** type, int types
 	return newsize;
 }
 
-static unsigned int swap_endian(unsigned int value)
+static uint32_t swap_endian(unsigned int value)
 {
 	// Swap endian (big to little) or (little to big)
 	unsigned int b0, b1, b2, b3;
@@ -232,9 +319,9 @@ static unsigned int swap_endian(unsigned int value)
 	return res;
 }
 
-static unsigned int crc32(unsigned char* buffer, int size)
+static uint32_t crc32(unsigned char* buffer, int size)
 {
-	static unsigned int crc_table[256] = {
+	static uint32_t crc_table[256] = {
 		0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
 		0x0eDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
 		0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE, 0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
@@ -269,10 +356,52 @@ static unsigned int crc32(unsigned char* buffer, int size)
 		0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94, 0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
 	};
 
-	unsigned int crc = ~0u;
+	uint32_t crc = ~0u;
 
 	for (int i = 0; i < size; i++) crc = (crc >> 8) ^ crc_table[buffer[i] ^ (crc & 0xff)];
 
 	return ~crc;
 }
 #endif
+
+/*
+This software is available as a choice of the following licenses. Choose
+whichever you prefer.
+===============================================================================
+ALTERNATIVE 1 - Public Domain (www.unlicense.org)
+===============================================================================
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+For more information, please refer to <http://unlicense.org/>
+===============================================================================
+ALTERNATIVE 2 - MIT No Attribution
+===============================================================================
+Copyright 2020 Takase
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
