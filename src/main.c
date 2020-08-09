@@ -1,17 +1,17 @@
 #define _CRT_SECURE_NO_DEPRECATE
 
-#include "mpng.h"
 
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "bork.h"
+#include "mpng.h"
 #include "util.h"
-#include "argv.h"
 
 static void
-briefusage(bool usageonly)
+briefusage(bool usage_only)
 {
     printf("Usage: " PNGMETA_NAME
         " [-ADR]"
@@ -20,7 +20,7 @@ briefusage(bool usageonly)
         " [-e] [--human]"
         " [--chunk CHUNKIDX]"
         " FILE1 FILE2 ...\n");
-    if (!usageonly)
+    if (!usage_only)
     {
         printf(PNGMETA_NAME ": No mode or file specified.\n");
         exit(EXIT_FAILURE);
@@ -49,16 +49,16 @@ usage()
 }
 
 static void
-_process(
+process(
     char* infile, char* outfile,
     enum PNGMETA_OP op,
-    char* key, char* text,
-    int* selchunks, int selchunkidx,
+    dynstr* kv,
+    dynint* selchunks,
     bool exclusive, bool human)
 {
     FILE* f = fopen(infile, "rb");
     if (f == NULL)
-        die(PNGMETA_NAME ": Unable to open input file '%s'\n", infile);
+        die("Unable to open input file '%s'\n", infile);
 
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
@@ -66,7 +66,7 @@ _process(
     unsigned char* buffer = NULL;
     buffer = malloc(fsize * sizeof(unsigned char));
     if (buffer == NULL)
-        die(PNGMETA_NAME ": Failed to allocate %ld bytes for reading png file\n", fsize);
+        die("Failed to allocate %ld bytes for reading png file\n", fsize);
 
     fread(buffer, sizeof(unsigned char), fsize, f);
     fclose(f);
@@ -75,19 +75,9 @@ _process(
     {
         case PNGMETA_OP_ADD_TEXT:
         {
-            int keysize = strlen(key) + 1;
-            int strsize = strlen(text);
-            unsigned char* chunkdata = malloc((keysize + strsize) * sizeof(unsigned char)); // png texts no EOF, only keys need it
-            memcpy(chunkdata, key, keysize);
-            memcpy(chunkdata + keysize, text, strsize);
-            png_chunk chunk = {
-                .type = "tEXt",
-                .length = keysize + strsize,
-                .data = chunkdata
-            };
             FILE* output = fopen(outfile, "wb");
             if (output == NULL)
-                die(PNGMETA_NAME ": Unable to open output file '%s'\n", outfile);
+                die("Unable to open output file '%s'\n", outfile);
 
             int newfsize = 0;
             if (exclusive)
@@ -96,14 +86,14 @@ _process(
                 char* chunktype[] = { "tEXt" };
                 int newsize = png_remove_chunk_by_type(buffer, fsize, chunktype, 1);
                 fsize = newsize;
-                newsize = png_add_chunk(buffer, fsize, &chunk, 1);
+                newsize = png_add_text_chunks(buffer, fsize, kv->ptr, kv->size);
                 if (newfsize == fsize)
                     die(PNGMETA_NAME ": Resulting file size is equal to original file size. Something went wrong.\n");
                 fwrite(buffer, sizeof(unsigned char), newsize, output);
             }
             else
             {
-                int newsize = png_add_chunk(buffer, fsize, &chunk, 1);
+                int newsize = png_add_text_chunks(buffer, fsize, kv->ptr, kv->size);
                 if (newfsize == fsize)
                     die(PNGMETA_NAME ": Resulting file size is equal to original file size. Something went wrong.\n");
                 fwrite(buffer, sizeof(unsigned char), newsize, output);
@@ -148,30 +138,30 @@ _process(
 
         case PNGMETA_OP_REMOVE_TEXT:
         {
-            int newsize = png_remove_chunk(buffer, fsize, selchunks, selchunkidx);
+            int newsize = png_remove_chunks(buffer, fsize, selchunks->ptr, selchunks->size);
             if (newsize == fsize)
-                die(PNGMETA_NAME ": Resulting file size is equal to original file size. Something went wrong.\n");
+                die("Resulting file size is equal to original file size. Something went wrong.\n");
 
             FILE* output = fopen(outfile, "wb");
             if (output == NULL)
-                die(PNGMETA_NAME ": Unable to open output file '%s'\n", outfile);
+                die("Unable to open output file '%s'\n", outfile);
             fwrite(buffer, sizeof(unsigned char), newsize, output);
 
             printf("success: Removed chunk(s) from '%s'\n", outfile);
             fclose(output);
             break;
         }
-		case PNGMETA_OP_NONE:
-		{
-			// TODO: Do todo
-		}
+        case PNGMETA_OP_NONE:
+        {
+            die("How did you get here?\n");
+            break;
+        }
     }
 }
 
 int
 main(int argc, char* argv[])
 {
-    char* _infile = NULL;
     char* outdir = NULL;
     char* key = NULL;
     char* text = NULL;
@@ -179,136 +169,128 @@ main(int argc, char* argv[])
     bool human = 0;
     enum PNGMETA_OP png_op = PNGMETA_OP_NONE;
 
-    int* chunks = NULL;
-    int chunkidx = 0;
-    int chunksize = 0;
+    dynint chunks = dynint_init(1);
+    dynstr kv = dynstr_init(2);
+    dynstr infiles = dynstr_init(1);
 
-    LONGOPT {
-        if (strcmp(option, "add") == 0)
-            png_op = PNGMETA_OP_ADD_TEXT;
-        else if (strcmp(option, "dump") == 0)
-            png_op = PNGMETA_OP_DUMP_TEXT;
-        else if (strcmp(option, "remove") == 0)
-            png_op = PNGMETA_OP_REMOVE_TEXT;
-        else if (strcmp(option, "help") == 0)
-            usage();
-        else if (strcmp(option, "key") == 0)
-            key = optarg;
-        else if (strcmp(option, "text") == 0)
-            key = optarg;
-        else if (strcmp(option, "dir") == 0)
-            outdir = optarg;
-        else if (strcmp(option, "exclusive") == 0)
-            exclusive = true;
-        else if (strcmp(option, "human") == 0)
-            human = true;
-        else if (strcmp(option, "chunk") == 0)
-        {
-            if (chunks == NULL)
-            {
-                chunks = malloc(1 * sizeof(int));
-                if (chunks == NULL)
-                    die(PNGMETA_NAME ": Unable to allocate %d bytes to store chunk index\n", 1);
-                chunksize = 1;
-            }
-            if (chunkidx >= chunksize - 1)
-            {
-                int *newchunks = realloc(chunks, (chunksize *= 2) * sizeof(int));
-                if (newchunks == NULL)
-                    die(PNGMETA_NAME ": Unable to reallocate %d bytes to store chunk index\n", chunksize);
-                chunks = newchunks;
-            }
+    char* lastopt = "";
+    char lastsopt = '\0';
+    STARTOPT{
+        LONGOPT{
+            // check if the last option is key
+            // if not followed by text, program dies
+            if ((strcmp(lastopt, "key") == 0 || lastsopt == 'k') &&
+                strcmp(option, "text") != 0)
+                die("--key is not followed immediately by --text");
 
-            chunks[chunkidx++] = strtol_or_die(optarg);
-        }
-        else
-            die(PNGMETA_NAME ": Unreconigzed option '%s'\n", option);
-    }
-        SHORTOPT
-    {
-        switch (option) {
-            case 'A':
+            if (strcmp(option, "add") == 0)
                 png_op = PNGMETA_OP_ADD_TEXT;
-                break;
-            case 'D':
+            else if (strcmp(option, "dump") == 0)
                 png_op = PNGMETA_OP_DUMP_TEXT;
-                break;
-            case 'R':
+            else if (strcmp(option, "remove") == 0)
                 png_op = PNGMETA_OP_REMOVE_TEXT;
-                break;
-            case 'h':
-                    usage();
-                break;
-            case 'k':
-                key = optarg;
-                break;
-            case 't':
-                text = optarg;
-                break;
-            case 'd':
-                outdir = optarg;
-                break;
-            case 'e':
-                exclusive = true;
-                break;
-            case 'c': {
-                if (chunks == NULL)
-                {
-                    chunks = malloc(1 * sizeof(int));
-                    if (chunks == NULL)
-                        die(PNGMETA_NAME ": Unable to allocate %d bytes to store chunk index\n", 1);
-                    chunksize = 1;
-                }
-                if (chunkidx >= chunksize - 1)
-                {
-                    int* newchunks = realloc(chunks, (chunksize *= 2) * sizeof(int));
-                    if (newchunks == NULL)
-                        die(PNGMETA_NAME ": Unable to reallocate %d bytes to store chunk index\n", chunksize);
-                    chunks = newchunks;
-                }
-
-                chunks[chunkidx++] = strtol_or_die(optarg);
-                break;
+            else if (strcmp(option, "help") == 0)
+                usage();
+            else if (strcmp(option, "key") == 0)
+                dynstr_add(&kv, GETS());
+            else if (strcmp(option, "text") == 0)
+            {
+                if (strcmp(lastopt, "key") != 0 &&
+                    lastsopt != 'k')
+                    die("--text is not preceeded by --key\n");
+                dynstr_add(&kv, GETS());
             }
+            else if (strcmp(option, "dir") == 0)
+                outdir = GETS();
+            else if (strcmp(option, "exclusive") == 0)
+                exclusive = true;
+            else if (strcmp(option, "human") == 0)
+                human = true;
+            else if (strcmp(option, "chunk") == 0)
+                dynint_add(&chunks, strtol_or_die(GETS()));
+            else
+                die(PNGMETA_NAME ": Unreconigzed option '%s'\n", option);
+        lastopt = option;
         }
-    } NONOPT {
-        // TODO
+            SHORTOPT
+        {
+            if ((strcmp(lastopt, "key") == 0 || lastsopt == 'k') &&
+                option != 't')
+                die("--key is not followed immediately by --text");
+            switch (option) {
+                case 'A':
+                    png_op = PNGMETA_OP_ADD_TEXT;
+                    break;
+                case 'D':
+                    png_op = PNGMETA_OP_DUMP_TEXT;
+                    break;
+                case 'R':
+                    png_op = PNGMETA_OP_REMOVE_TEXT;
+                    break;
+                case 'h':
+                        usage();
+                    break;
+                case 'k':
+                    dynstr_add(&kv, GETS());
+                    break;
+                case 't':
+                    if (strcmp(lastopt, "key") != 0 &&
+                        lastsopt != 'k')
+                        die("--text is not preceeded by --key\n");
+                    dynstr_add(&kv, GETS());
+                    break;
+                case 'd':
+                    outdir = GETS();
+                    break;
+                case 'e':
+                    exclusive = true;
+                    break;
+                case 'c': {
+                    dynint_add(&chunks, strtol_or_die(GETS()));
+                    break;
+                }
+            }
+            lastsopt = option;
+        } NONOPT {
+            dynstr_add(&infiles, nonopt);
+        }
     } ENDOPT
 
-
-    if (png_op == PNGMETA_OP_NONE || !argc)
+    if (kv.size % 2 != 0)
+        die("Incomplete key-value pair, how did you even reach here?\n");
+    if (png_op == PNGMETA_OP_NONE || infiles.size == 0)
         briefusage(false);
-    if (png_op == PNGMETA_OP_ADD_TEXT && (text == NULL || key == NULL))
-        die(PNGMETA_NAME ": no key or text specified.\n");
+    if (png_op == PNGMETA_OP_ADD_TEXT && kv.size == 0)
+        die("no key or text specified.\n");
 
-    /*
-    for (int i = 0; i < argc; i++)
+    for (int i = 0; i < infiles.size; i++)
     {
         bool alloc = false;
+        char* infile = infiles.ptr[i];
         char* outfile = NULL;
         if (outdir)
         {
             alloc = true;
-            char* infilename = getfilename(argv[i]);
+            char* filename = getfilename(infile);
             int outdirlen = strlen(outdir);
-            int ifnlen = infilename - argv[i]; // pointer arithmetic might be faster here
-            outfile = malloc((ifnlen + outdirlen + 1) * sizeof(char));
+            int fnlen = filename - infile; // pointer arithmetic might be faster here
+            outfile = malloc((outdirlen + fnlen + 1) * sizeof(char));
             if (outfile == NULL)
-                die(PNGMETA_NAME ": Unable to allocate %d bytes for creating string\n", ifnlen + outdirlen + 1);
+                die("Unable to allocate %d bytes for creating string\n", outdirlen + fnlen + 1);
 
             memcpy(outfile, outdir, outdirlen);
-            memcpy(outfile + outdirlen, infilename, ifnlen);
-            outfile[outdirlen + ifnlen + 1] = '\0';
+            memcpy(outfile + outdirlen, filename, fnlen);
+            outfile[outdirlen + fnlen + 1] = '\0';
         }
         else
-            outfile = argv[i];
+            outfile = infile;
 
         
         process(
-            argv[i], outfile,
+            infile, outfile,
             png_op,
-            key, text,
-            chunks, chunkidx,
+            &kv,
+            &chunks,
             exclusive, human
         );
 
@@ -316,7 +298,4 @@ main(int argc, char* argv[])
         if (alloc)
             free(outfile);
     }
-    */
-
-    free(chunks);
-}}
+}
