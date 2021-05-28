@@ -1,0 +1,185 @@
+dnl -*- shell-script -*-
+dnl
+dnl Process this file with autoconf to produce a configure script.
+dnl
+dnl $Id: configure.in,v 1.7 2001/05/16 15:14:22 cmdjb Exp $
+dnl
+dnl Copyright 1998-2000 Dave Beckett, ILRT, University of Bristol
+dnl http://purl.org/net/dajobe/
+dnl
+
+AC_REVISION($Revision: 1.7 $)
+AC_INIT(pngmeta.c)
+AM_INIT_AUTOMAKE(pngmeta, [1.11])
+AC_PREREQ(2.12)
+
+dnl Checks for programs.
+AC_PROG_CC
+
+
+
+
+# Allow use of libpng and zlib from raw distributions
+AC_ARG_WITH(zlib,
+[  --with-zlib=DIR         DIR is root for libz distribution])
+
+if test "X$with_zlib" = "X"; then
+  AC_MSG_CHECKING(for installed zlib)
+  oLIBS="$LIBS"
+  LIBS="$LIBS -lz"
+  AC_TRY_LINK([#include <zlib.h>], [z_streamp zstream; char *s=zlibVersion();],
+	      with_zlib=default
+	      AC_MSG_RESULT(yes),
+	      AC_MSG_RESULT(no))
+  LIBS="$oLIBS"
+else
+  AC_MSG_CHECKING(for local copy of zlib distribution)
+  AC_MSG_RESULT($with_zlib)
+fi
+
+if test "X$with_zlib" = "X"; then
+  AC_MSG_CHECKING(for local copy of zlib distribution)
+  for dir in zlib-[0-9]* zlib ../zlib-[0-9]* ../zlib; do
+    if test -d $dir -a -f $dir/zlib.h; then
+      with_zlib=$dir
+      break
+    fi
+  done
+  if test "X$with_zlib" != "X"; then
+    AC_MSG_RESULT($with_zlib)
+    ZLIB_INCLUDE=$with_zlib
+  else
+    AC_MSG_RESULT(no)
+  fi
+fi
+
+if test $with_zlib != default; then
+  LIBS="$LIBS -L$with_zlib"
+  CFLAGS="$CFLAGS -I$with_zlib"
+fi
+
+
+AC_ARG_WITH(png,
+[  --with-png=DIR          DIR is root for libpng distribution])
+
+if test "X$with_png" = "X"; then
+  AC_MSG_CHECKING(for installed libpng)
+  oLIBS="$LIBS"
+  LIBS="$LIBS -lpng"
+  AC_TRY_LINK([#include <png.h>], [png_structp png_ptr; png_infop info_ptr;    info_ptr = png_create_info_struct(png_ptr); ],
+	      with_png=default
+	      AC_MSG_RESULT(yes),
+              LIBS="$oLIBS"
+	      AC_MSG_RESULT(no))
+else
+  AC_MSG_CHECKING(for local copy of libpng distribution)
+  AC_MSG_RESULT($with_png)
+fi
+
+if test "X$with_png" = "X"; then
+  AC_MSG_CHECKING(for local copy of libpng distribution)
+  for dir in libpng-[0-9]* libpng ../libpng-[0-9]* ../libpng; do
+    if test -d $dir -a -f $dir/png.h; then
+      with_png=$dir
+      break
+    fi
+  done
+  if test "X$with_png" != "X"; then
+    AC_MSG_RESULT($with_png)
+    PNG_INCLUDE=$with_png
+  else
+    AC_MSG_RESULT(no)
+  fi
+fi
+
+if test $with_png != default; then
+  LIBS="$LIBS -L$with_png -lpng"
+  CFLAGS="$CFLAGS -I$with_png"
+fi
+
+
+dnl Checks for libraries.
+
+# Allow use of libpng and zlib from installed areas
+AC_ARG_WITH(zlib_lib,
+[  --with-zlib-lib=LIB     LIB is path to libz.a])
+if test "X$with_zlib_lib" != "X"; then
+  LIBS="$LIBS -L$with_zlib_lib"
+fi
+
+AC_CHECK_LIB(z, zlibVersion, [],
+[ AC_MSG_ERROR(could not find libz)]
+)
+
+# libpng always needs this
+LIBS="$LIBS -lm"
+
+AC_ARG_WITH(png_lib,
+[  --with-png-lib=LIB      LIB is path to libpng.a])
+if test "X$with_png_lib" != "X"; then
+  LIBS="$LIBS -L$with_png_lib"
+fi
+
+AC_CHECK_LIB(png, png_create_read_struct, [],
+[ AC_MSG_ERROR(could not find libpng)]
+)
+
+
+
+
+
+dnl Checks for header files.
+AC_ARG_WITH(png-includes,
+[  --with-png-includes=DIR DIR is path where PNG header files can be found])
+
+if test "X$with_png" = X; then
+  AC_MSG_CHECKING(for location of png includes)
+  if test "X$PNG_INCLUDE" = X; then
+    if test "X$with_png_includes" != "X"; then
+      PNG_INCLUDE=$with_png_includes
+    fi
+  fi
+  if test ! -f "$PNG_INCLUDE/png.h"; then
+    AC_MSG_ERROR(could not find png.h in $PNG_INCLUDE)
+  fi
+  if test ! -f "$PNG_INCLUDE/pngconf.h"; then
+    AC_MSG_ERROR(could not find pngconf.h in $PNG_INCLUDE)
+  fi
+
+  AC_MSG_RESULT($PNG_INCLUDE)
+  CFLAGS="-I$(PNG_INCLUDE) $(CFLAGS)"
+fi
+
+
+AC_ARG_WITH(zlib-includes,
+[  --with-zlib-includes=DIR DIR is path where ZLIB header files can be found])
+if test "X$with_zlib" = X; then
+  AC_MSG_CHECKING(for location of zlib includes)
+  if test "X$with_zlib_includes" != "X"; then
+    ZLIB_INCLUDE=$with_zlib_includes
+  fi
+  if test ! -f "$ZLIB_INCLUDE/zlib.h"; then
+    AC_MSG_ERROR(could not find zlib.h in $ZLIB_INCLUDE)
+  fi
+  if test ! -f "$ZLIB_INCLUDE/zconf.h"; then
+    AC_MSG_ERROR(could not find zconf.h in $ZLIB_INCLUDE)
+  fi
+
+  AC_MSG_RESULT($ZLIB_INCLUDE)
+  CFLAGS="-I$(PNG_INCLUDE) $(CFLAGS)"
+fi
+
+
+
+## I have no idea why autoconf makes me need to do this.
+## Of course on M$DOS it should be .exe
+EXEEXT=
+AC_SUBST(EXEEXT)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+
+dnl Checks for library functions.
+AC_CHECK_FUNCS([png_create_read_struct png_get_text])
+
+
+AC_OUTPUT([Makefile config.h pngmeta.spec])
