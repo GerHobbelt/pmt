@@ -4,13 +4,18 @@
 /* Copyright 2013 Glenn Randers-Pehrson */
 
 /* Usage:            
- * pngidat.exe < file.png > file.ihdr
+ * pngihdr.exe < file.png > file.ihdr
  *
  * file.ihdr is the image datastream, with the PNG signature bytes
  * and all chunks up to the first IDAT.
  */
 
-main()
+#if defined(BUILD_MONOLITHIC)
+#include "pngtools-monolithic.h"
+#define main(cnt, arr)      pngihdr_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
 {
    unsigned int i;
    unsigned int len[5];
@@ -95,4 +100,5 @@ main()
       }
    
    }
+   return 0;
 }

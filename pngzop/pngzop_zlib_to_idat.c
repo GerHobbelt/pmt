@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 
-#include <zlib.h> /* for crc32 */
+#include "zlib-ng.h" /* for crc32 */
 
 void
 put_uLong(uLong val)
@@ -37,12 +37,16 @@ put_chunk(const unsigned char *chunk, uInt length)
    put_uLong(length-4); /* Exclude the tag */
    fwrite(chunk, 1, length, stdout);
 
-   crc = crc32(0, Z_NULL, 0);
-   put_uLong(crc32(crc, chunk, length));
+   crc = zng_crc32(0, Z_NULL, 0);
+   put_uLong(zng_crc32(crc, chunk, length));
 }
 
-int
-main()
+#if defined(BUILD_MONOLITHIC)
+#include "pngtools-monolithic.h"
+#define main(cnt, arr)      pngzop_zlib_to_idat_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
 {
    unsigned char buf[250000];
    int c;
@@ -91,5 +95,6 @@ main()
 
       n=4;
    }
+   return 0;
 }
 

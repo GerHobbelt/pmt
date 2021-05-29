@@ -5,6 +5,8 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
+#define PNGCRUSH_H 1
+
 #define PNGCRUSH_VERSION "1.8.14"
 
 #undef BLOCKY_DEINTERLACE
@@ -1473,7 +1475,7 @@ static int copy_idat = 0; /* = 1 to simply copy the IDAT chunk data */
 #  define CLOCKS_PER_SEC 1000
 #endif
 
-#ifdef __STDC__
+#if defined(__STDC__) || defined(_MSC_VER)
 #  define TIME_T clock_t
 #else
 #  if CLOCKS_PER_SEC <= 100
@@ -1517,14 +1519,13 @@ static int copy_idat = 0; /* = 1 to simply copy the IDAT chunk data */
 #    define PNGCRUSH_USE_CLOCK_GETTIME 0
 #endif
 
-#ifndef LIBPNG_UNIFIED
-#include <png.h>
+/* Needed to access various internal PNG chunk routines */
+#define PNG_INTERNAL
+#include "pngpriv.h"
+#include "png.h"
+
 #define PNGCRUSH_TIMER_UINT_API extern unsigned int PNGAPI
 #define PNGCRUSH_TIMER_VOID_API extern void PNGAPI
-#else
-#define PNGCRUSH_TIMER_UINT_API unsigned int
-#define PNGCRUSH_TIMER_VOID_API void
-#endif
 
 #define PNGCRUSH_TIMER_DECODE 1
 #define PNGCRUSH_TIMER_ENCODE 2
@@ -1656,94 +1657,6 @@ static unsigned long pngcrush_timer_min_secs[PNGCRUSH_TIMERS];
 static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #endif /* PNGCRUSH_TIMERS */
 
-
-#ifdef ZLIB_AMALGAMATED
-/* See
- https://blog.forrestthewoods.com/
- improving-open-source-with-amalgamation-cf293592c5f4#.g9fb2tyhs
- */
-#include "zlib_amalg.c"
-#define ZLIB_H
-#endif /* ZLIB_AMALGAMATED */
-
-#ifdef ZLIB_UNIFIED  /* Not working */
-#include "zutil.h"
-
-#include "adler32.c"
-#undef DO1
-#undef DO8
-
-#include "compress.c"
-#include "crc32.c"
-#include "deflate.c"
-#include "infback.c"
-#undef PULLBYTE
-
-#include "inffast.c"
-#undef CHECK
-#undef CODES
-#undef DISTS
-#undef DONE
-#undef LENGTH
-#undef LENS
-
-#include "inflate.c"
-#undef CHECK
-#undef CODES
-#undef DISTS
-#undef DONE
-#undef LENGTH
-#undef LENS
-#undef PULLBYTE
-
-#include "inftrees.c"
-#undef CHECK
-#undef CODES
-#undef DISTS
-#undef DONE
-#undef LENGTH
-#undef LENS
-
-#include "trees.c"
-#include "uncompr.c"
-#include "zutil.c"
-#endif /* ZLIB_UNIFIED */
-
-#ifdef LIBPNG_UNIFIED
-#include "pngcrush.h"
-#include "png.c"
-#include "pngerror.c"
-#include "pngget.c"
-#include "pngmem.c"
-#include "pngpread.c"
-#include "pngread.c"
-#include "pngrio.c"
-#include "pngrtran.c"
-#include "pngrutil.c"
-#include "pngset.c"
-#include "pngtrans.c"
-#include "pngwio.c"
-#include "pngwrite.c"
-#include "pngwtran.c"
-#include "pngwutil.c"
-#ifdef PNGCRUSH_USE_ARM_NEON
-# include "arm_init.c"
-# include "filter_neon_intrinsics.c"
-#endif
-#ifdef PNGCRUSH_USE_MIPS_NSA
-# include "mips_init.c"
-# include "filter_msa_intrinsics.c"
-#endif
-#ifdef PNGCRUSH_USE_INTEL_SSE
-# include "intel_init.c"
-# include "filter_sse2_intrinsics.c"
-#endif
-#ifdef PNGCRUSH_USE_POWERPC_VSX
-# include "powerpc_init.c"
-# include "filter_vsx_intrinsics.c"
-#endif
-#endif /* LIBPNG_UNIFIED */
-
 #include "png.h"
 
 #ifndef PNGCBAPI  /* Needed when building with libpng-1.4.x and earlier */
@@ -1817,16 +1730,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #endif /* PNGCRUSH_LIBPNG_VER < 10500 */
 
 #if PNGCRUSH_LIBPNG_VER >= 10500
-#if !defined(ZLIB_AMALGAMATED) && !defined(ZLIB_UNIFIED)
-   /* "#include <zlib.h>" is not provided by libpng15 */
-#ifdef PNGCRUSH_H
-   /* Use the bundled zlib */
-#  include "zlib.h"
-#else
-   /* Use the system zlib */
-#  include <zlib.h>
-#endif
-#endif /* ZLIB_AMALGAMATED || ZLIB_UNIFIED */
+#  include "zlib-ng.h"
 
    /* Not provided by libpng16 */
 #  include <string.h>
@@ -1857,7 +1761,6 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #  endif
 #endif
 
-#ifndef LIBPNG_UNIFIED
 #define PNG_IDAT const png_byte png_IDAT[5] = { 73,  68,  65,  84, '\0'}
 #define PNG_IHDR const png_byte png_IHDR[5] = { 73,  72,  68,  82, '\0'}
 #define PNG_acTL const png_byte png_acTL[5] = { 97,  99,  84,  76, '\0'}
@@ -1866,7 +1769,6 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #define PNG_fdAT const png_byte png_fdAT[5] = {102, 100,  65,  84, '\0'}
 #define PNG_iCCP const png_byte png_iCCP[5] = {105,  67,  67,  80, '\0'}
 #define PNG_IEND const png_byte png_IEND[5] = { 73,  69,  78,  68, '\0'}
-#endif
 
 /* GRR 20050220:  added these, which apparently aren't defined anywhere else */
 /* GRP 20110714:  define PNG_UINT_32_NAME macro and used that instead */
@@ -1978,25 +1880,6 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #  define PNG_UINT_zTXt PNG_UINT_32_NAME(122, 84, 88, 116)
 #endif
 
-#ifndef LIBPNG_UNIFIED
-#define PNG_FLAG_CRC_ANCILLARY_USE        0x0100
-#define PNG_FLAG_CRC_ANCILLARY_NOWARN     0x0200
-#define PNG_FLAG_CRC_CRITICAL_USE         0x0400
-#define PNG_FLAG_CRC_CRITICAL_IGNORE      0x0800
-#define PNG_FLAG_CRC_ANCILLARY_MASK (PNG_FLAG_CRC_ANCILLARY_USE | \
-                                     PNG_FLAG_CRC_ANCILLARY_NOWARN)
-#define PNG_PACK               0x0004
-#define PNG_DITHER             0x0040
-#define PNG_BACKGROUND         0x0080
-#define PNG_16_TO_8            0x0400
-#define PNG_RGBA               0x0800
-#define PNG_EXPAND             0x1000
-#define PNG_GAMMA              0x2000
-#define PNG_GRAY_TO_RGB        0x4000
-#define PNG_FILLER             0x8000L
-#define PNG_USER_TRANSFORM   0x100000L
-#define PNG_RGB_TO_GRAY      0x600000L  /* two bits, RGB_TO_GRAY_ERR|WARN */
-#endif /* LIBPNG_UNIFIED */
 
 /*
  * We don't need some of the extra libpng transformations
@@ -2017,11 +1900,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 # define PNGCRUSH_LOCO
 #endif
 
-#ifdef PNGCRUSH_H
 int png_ignore_crc = 0;
-#else
-png_uint_32 pngcrush_crc;
-#endif
 
 #ifndef PNG_UINT_31_MAX
 #define PNG_UINT_31_MAX ((png_uint_32)0x7fffffffL)
@@ -2081,7 +1960,7 @@ png_uint_32 pngcrush_crc;
 #include <assert.h>
 #include <errno.h>
 
-#if defined(_MBCS) || defined(WIN32) || defined(__WIN32__)
+#if defined(_MBCS) || defined(WIN32) || defined(WIN64) || defined(__WIN32__)
 #  include <direct.h>
 #endif
 
@@ -2190,40 +2069,40 @@ static int do_pplt = 0;
 static png_uint_32 max_rows_at_a_time = 1;
 static png_uint_32 rows_at_a_time;
 #endif
-char pplt_string[STR_BUF_SIZE];
-char *ip, *op, *dot;
-char in_string[STR_BUF_SIZE];
-char prog_string[STR_BUF_SIZE];
-char out_string[STR_BUF_SIZE];
-char in_extension[STR_BUF_SIZE];
+static char pplt_string[STR_BUF_SIZE];
+static char *ip, *op, *dot;
+static char in_string[STR_BUF_SIZE];
+static char prog_string[STR_BUF_SIZE];
+static char out_string[STR_BUF_SIZE];
+static char in_extension[STR_BUF_SIZE];
 static int text_inputs = 0;
-int text_where[10];           /* 0: no text; 1: before PLTE; 2: after PLTE */
-int text_compression[10];     /* -1: uncompressed tEXt; 0: compressed zTXt
+static int text_where[10];           /* 0: no text; 1: before PLTE; 2: after PLTE */
+static int text_compression[10];     /* -1: uncompressed tEXt; 0: compressed zTXt
                                   1: uncompressed iTXt; 2: compressed iTXt */
-char text_text[11*STR_BUF_SIZE+1]; /* It would be nice to png_malloc this but we
+static char text_text[11*STR_BUF_SIZE+1]; /* It would be nice to png_malloc this but we
                                     don't have a png_ptr yet when we need it. */
-char text_keyword[11*80+1];
+static char text_keyword[11*80+1];
 
 /* PNG_iTXt_SUPPORTED */
-char text_lang[881];
-char text_lang_key[881];
+static char text_lang[881];
+static char text_lang_key[881];
 
 /* PNG_iCCP_SUPPORTED */
-int iccp_length = 0;
-char *iccp_text;
-char *iccp_file;
-char iccp_name[80];
+static int iccp_length = 0;
+static char *iccp_text = NULL;
+static const char *iccp_file;
+static char iccp_name[80];
 
-int best;
+static int best;
 
-char buffer[256];
+static char buffer[256];
 
 /* Set up the "cexcept" Try/Throw/Catch exception handler. */
 #include "cexcept.h"
 define_exception_type(const char *);
 extern struct exception_context the_exception_context[1];
 struct exception_context the_exception_context[1];
-png_const_charp msg;
+static png_const_charp msg;
 
 static png_uint_32 input_length;
 static png_uint_32 total_input_length = 0;
@@ -2379,8 +2258,8 @@ static png_bytep png_row_filters = NULL;
 unsigned int pc_timer;
 static float t_filter[PNGCRUSH_TIMERS] = {0};
 static png_uint_32 filter_count[PNGCRUSH_TIMERS] = {0};
-png_uint_32 t_sec;
-png_uint_32 t_nsec;
+static png_uint_32 t_sec;
+static png_uint_32 t_nsec;
 #endif
 
 static png_uint_32 max_idat_size = MAX_IDAT_SIZE; /* increases the IDAT size */
@@ -2390,7 +2269,7 @@ static png_uint_32 crushed_idat_size = 0x3ffffffL;
 static int already_crushed = 0;
 #endif
 
-int ia;
+static int ia;
 
 #if defined(PNG_UNKNOWN_CHUNKS_SUPPORTED)
 static /* const */ png_byte chunks_to_ignore[] = {
@@ -2426,10 +2305,6 @@ static void pngcrush_warning(png_structp png_ptr,
 void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
-#ifdef PNGCRUSH_H
-void png_read_transform_info(png_structp png_ptr, png_infop info_ptr);
-#endif
-
 void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
@@ -2450,16 +2325,15 @@ static int mkdir(const char *name, int ignored)
 static void setfiletype(const char *name)
 #endif
 
-int keep_unknown_chunk(png_const_charp name, char *argv[]);
-int keep_chunk(png_const_charp name, char *argv[]);
-void show_result(void);
-png_uint_32 measure_idats(FILE * fp);
-png_uint_32 pngcrush_measure_idat(png_structp png_ptr);
+static int keep_unknown_chunk(png_const_charp name, const char *argv[]);
+static int keep_chunk(png_const_charp name, const char *argv[]);
+static void show_result(void);
+static png_uint_32 measure_idats(FILE * fp);
+static png_uint_32 pngcrush_measure_idat(png_structp png_ptr);
 
-void print_version_info(void);
-void print_usage(int retval);
+static void print_version_info(void);
+static void print_usage(int retval);
 
-#ifdef PNGCRUSH_H
 /* Use unexported functions in the embedded libpng */
 # define pngcrush_reset_crc(png_ptr) png_reset_crc(png_ptr)
 # define pngcrush_calculate_crc(png_ptr, ptr, length) \
@@ -2469,134 +2343,6 @@ void print_usage(int retval);
 # define pngcrush_crc_error(png_ptr) png_crc_error(png_ptr)
 # define pngcrush_crc_finish(png_ptr, skip) png_crc_finish(png_ptr, skip)
 
-#else
-/*
- * ============================================================
- * We aren't using the bundled libpng functions, so we must
- * reproduce the libpng routines that aren't exported by libpng
- * ============================================================
- */
-
-# if (PNGCRUSH_LIBPNG_VER >= 10209)
-#   ifndef PNG_READ_BIG_ENDIAN_SUPPORTED
-#     undef pngcrush_get_uint_32
-png_uint_32 pngcrush_get_uint_32(png_bytep buf);
-/* Grab an unsigned 32-bit integer from a buffer in big-endian format. */
-png_uint_32 /* PRIVATE */
-pngcrush_get_uint_32(png_bytep buf)
-{
-   png_uint_32 i = ((png_uint_32) (*buf & 0xff) << 24) +
-       (*(buf + 1) << 16) + (*(buf + 2) <<  8) + (*(buf + 3)) ;
-
-   return (i);
-}
-#   else /*! BIG_ENDIAN */
-#      define pngcrush_get_uint_32(buf) ( *((png_uint_32p) (buf)))
-#   endif /* BIG_ENDIAN */
-
-#   undef pngcrush_get_uint_31
-png_uint_32 pngcrush_get_uint_31(png_structp png_ptr, png_bytep buf);
-png_uint_32 /* PRIVATE */
-pngcrush_get_uint_31(png_structp png_ptr, png_bytep buf)
-{
-   png_uint_32 i = pngcrush_get_uint_32(buf);
-   if (i > PNG_UINT_31_MAX)
-   {
-     i=0;
-     png_error(png_ptr, "PNG unsigned integer out of range.\n");
-   }
-   return (i);
-}
-
-#   undef pngcrush_save_uint_32
-void pngcrush_save_uint_32(png_bytep buf, png_uint_32 i);
-void /* PRIVATE */
-pngcrush_save_uint_32(png_bytep buf, png_uint_32 i)
-{
-   buf[0] = (png_byte)((i >> 24) & 0xff);
-   buf[1] = (png_byte)((i >> 16) & 0xff);
-   buf[2] = (png_byte)((i >> 8) & 0xff);
-   buf[3] = (png_byte)(i & 0xff);
-}
-# endif  /* PNGCRUSH_LIBPNG_VER < 10209 */
-
-/*
- * Reset the CRC variable to 32 bits of 1's.  Care must be taken
- * in case CRC is > 32 bits to leave the top bits 0.
- */
-void PNGAPI
-pngcrush_reset_crc(png_structp png_ptr)
-{
-   pngcrush_crc = crc32(0, Z_NULL, 0);
-}
-/*
- * Calculate the CRC over a section of data.  We can only pass as
- * much data to this routine as the largest single buffer size.  We
- * also check that this data will actually be used before going to the
- * trouble of calculating it.
- */
-void PNGAPI
-pngcrush_calculate_crc(png_structp png_ptr, png_bytep ptr, png_size_t length)
-{
-   pngcrush_crc = crc32(pngcrush_crc, ptr, (uInt)length);
-}
-
-/* Read data, and (optionally) run it through the CRC. */
-void PNGAPI
-pngcrush_crc_read(png_structp png_ptr, png_bytep buf, png_size_t length)
-{
-   pngcrush_default_read_data(png_ptr, buf, length);
-   pngcrush_calculate_crc(png_ptr, buf, length);
-}
-
-/* Compare the CRC stored in the PNG file with that calculated by libpng from
- * the data it has read thus far.
- */
-int PNGAPI
-pngcrush_crc_error(png_structp png_ptr)
-{
-   png_byte crc_bytes[4];
-   png_uint_32 crc;
-
-   pngcrush_default_read_data(png_ptr, crc_bytes, 4);
-
-   crc = pngcrush_get_uint_32(crc_bytes);
-   return ((int)(crc != pngcrush_crc));
-}
-
-/*
- * Optionally skip data and then check the CRC.  Depending on whether we
- * are reading a ancillary or critical chunk, and how the program has set
- * things up, we may calculate the CRC on the data and print a message.
- * Returns '1' if there was a CRC error, '0' otherwise.
- */
-int PNGAPI
-pngcrush_crc_finish(png_structp png_ptr, png_uint_32 skip)
-{
-   png_size_t i;
-   png_byte bytes[1024];
-   png_size_t istop = 1024;
-
-   for (i = (png_size_t)skip; i > istop; i -= istop)
-   {
-      pngcrush_crc_read(png_ptr, bytes, (png_size_t)1024);
-   }
-   if (i)
-   {
-      pngcrush_crc_read(png_ptr, bytes, i);
-   }
-
-   if (pngcrush_crc_error(png_ptr))
-   {
-      {
-         png_chunk_error(png_ptr, "CRC error");
-      }
-      return (1);
-   }
-
-   return (0);
-}
-#endif /* PNGCRUSH_H */
 
 #ifdef PNG_STDIO_SUPPORTED
 /*
@@ -2960,7 +2706,7 @@ static void setfiletype(const char *name)
  *       names explicitly listed below AND command-line arg either used all-
  *       lowercase form or one of "all[ab]" options
  */
-int keep_unknown_chunk(png_const_charp name, char *argv[])
+static int keep_unknown_chunk(png_const_charp name, const char *argv[])
 {
     int i;
     if (remove_chunks == 0)
@@ -3008,7 +2754,7 @@ int keep_unknown_chunk(png_const_charp name, char *argv[])
 
 
 
-int keep_chunk(png_const_charp name, char *argv[])
+static int keep_chunk(png_const_charp name, const char *argv[])
 {
     int i;
     if (verbose > 2 && last_trial)
@@ -3097,7 +2843,7 @@ int keep_chunk(png_const_charp name, char *argv[])
 
 
 
-void show_result(void)
+static void show_result(void)
 {
     if (total_output_length) {
         if (total_input_length == total_output_length)
@@ -3227,7 +2973,7 @@ void show_result(void)
         "   **** Discarded APNG chunks. ****\n");
 }
 
-void pngcrush_write_png(png_structp write_pointer, png_bytep data,
+static void pngcrush_write_png(png_structp write_pointer, png_bytep data,
      png_size_t length)
 {
     pngcrush_write_byte_count += (int) length;
@@ -3242,7 +2988,7 @@ static void pngcrush_flush(png_structp png_ptr)
 }
 
 
-void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
+static void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
     row_info, png_bytep data)
 {
    if (blacken == 1 || make_gray == 1 || make_opaque == 1)
@@ -3492,7 +3238,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
    }
 }
 
-void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
+static void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
      png_bytep data)
 {
 
@@ -3568,7 +3314,12 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
 }
 
 
-int main(int argc, char *argv[])
+#if defined(BUILD_MONOLITHIC)
+#include "pngtools-monolithic.h"
+#define main(cnt, arr)      pngcrush_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
 {
     unsigned int bench = 0;
     png_uint_32 y;
@@ -4486,8 +4237,8 @@ int main(int argc, char *argv[])
             fprintf(STDERR, PNGCRUSH_VERSION);
             fprintf(STDERR, ", uses libpng ");
             fprintf(STDERR, PNG_LIBPNG_VER_STRING);
-            fprintf(STDERR, " and zlib ");
-            fprintf(STDERR, ZLIB_VERSION);
+            fprintf(STDERR, " and zlib-ng ");
+            fprintf(STDERR, ZLIBNG_VERSION);
             fprintf(STDERR, "\n Check http://pmt.sf.net/\n");
             fprintf(STDERR, " for the most recent version.\n");
             verbose = 0;
@@ -4675,7 +4426,7 @@ int main(int argc, char *argv[])
             if (fileexists(directory_name) & 2)
 #endif
             {
-#if defined(_MBCS) || defined(WIN32) || defined(__WIN32__)
+#if defined(_MBCS) || defined(WIN32) || defined(WIN64) || defined(__WIN32__)
                 if (_mkdir(directory_name))
 #else
                 if (mkdir(directory_name, 0755))
@@ -7000,30 +6751,8 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                  * Starting in libpng-1.5.6beta06, png_read_update_info()
                  * does not check the PNG_FLAG_ROW_INIT flag and does not
                  * initialize the row or issue a warning.
-                 *
                  */
-#ifdef PNGCRUSH_H
                 png_read_transform_info(read_ptr, read_info_ptr);
-#else
-                /* Some pngcrush capabilities are lacking when the system
-                 * libpng is used instead of the one bundled with pngcrush
-                 *
-                 * To do: list those capabilities here
-                 */
-
-                /* pngcrush fails to read interlaced PNGs properly
-                 * when png_read_update_info() is called here.
-                 */
-
-                /* png_read_update_info(read_ptr, read_info_ptr); */
-
-                /* Workaround is to multiply rowbytes by 8/bit_depth
-                 * to allow for unpacking, wherever we allocate a
-                 * row buffer.  This results in too large a value for
-                 * rowbytes under some conditions, e.g., when increasing
-                 * a sub-8-bit file to RGBA, but this is rare and harmless.
-                 */
-#endif
 
                 /* This is the default case (nosave == 1 -> perf-testing
                    only) */
@@ -8107,7 +7836,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 
 
 
-png_uint_32 measure_idats(FILE * fp_in)
+static png_uint_32 measure_idats(FILE * fp_in)
 {
     /* Copyright (C) 1999-2002, 2006-2015 Glenn Randers-Pehrson
        (glennrp at users.sf.net).  See notice in pngcrush.c for conditions of
@@ -8155,7 +7884,7 @@ png_uint_32 measure_idats(FILE * fp_in)
 #define PNGCRUSH_A  65
 #define PNGCRUSH_Z  90 
 
-png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
+static png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 {
     /* Copyright (C) 1999-2002, 2006-2015 Glenn Randers-Pehrson
        (glennrp at users.sf.net)
@@ -8689,9 +8418,9 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 }
 
 
-void print_version_info(void)
+static void print_version_info(void)
 {
-    char *zlib_copyright;
+    const char *zlib_copyright;
 
 #ifndef ZLIB_VERNUM /* This became available in zlib-1.2 */
          zlib_copyright=" (or later)";
@@ -8735,7 +8464,7 @@ void print_version_info(void)
 
     fprintf(STDERR,
       "\n"
-      " | pngcrush-%s\n"
+      " | pngcrush %s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
       " |    Copyright (C) 1998-2002, 2006-2017 Glenn Randers-Pehrson\n"
@@ -8744,17 +8473,17 @@ void print_version_info(void)
       " | granted to everyone to use this version of pngcrush without\n"
       " | payment of any fee.\n"
       " | Executable name is %s\n"
-      " | It was built with   %s libpng-%s\n"
-      " | and is running with %s libpng-%s\n"
+      " | It was built with   %s libpng %s\n"
+      " | and is running with %s libpng %s\n"
       " |    Copyright (C) 1998-2004, 2006-2017 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
-      " | and %s zlib-%s, Copyright (C) 1995%s,\n"
+      " | and %s zlib-ng %s, Copyright (C) 1995%s,\n"
       " |    Jean-loup Gailly and Mark Adler",
       PNGCRUSH_VERSION, progname,
       BUNDLED_LIB,PNG_LIBPNG_VER_STRING,
       BUNDLED_LIB,png_get_header_ver(NULL),
-      BUNDLED_LIB,ZLIB_VERSION,
+      BUNDLED_LIB,ZLIBNG_VERSION,
       zlib_copyright);
 
 #if PNGCRUSH_TIMERS > 0
@@ -9264,7 +8993,7 @@ struct options_help pngcrush_options[] = {
 
 
 
-void print_usage(int retval)
+static void print_usage(int retval)
 {
     int j, jmax;
 

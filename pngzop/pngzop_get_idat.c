@@ -11,7 +11,12 @@
  *
  */
 
-main()
+#if defined(BUILD_MONOLITHIC)
+#include "pngtools-monolithic.h"
+#define main(cnt, arr)      pngidat_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
 {
    unsigned int i;
    unsigned int buf[5];
@@ -73,4 +78,5 @@ for (;;)
          break;
    }
 }
+return 0;
 }

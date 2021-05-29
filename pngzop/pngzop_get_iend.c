@@ -10,7 +10,12 @@
  * last IDAT chunk.
  */
 
-main()
+#if defined(BUILD_MONOLITHIC)
+#include "pngtools-monolithic.h"
+#define main(cnt, arr)      pngiend_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
 {
    unsigned int c;
    unsigned int i;
@@ -109,4 +114,5 @@ main()
             break;
          }
    }
+   return 0;
 }

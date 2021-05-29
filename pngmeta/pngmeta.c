@@ -64,15 +64,28 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#if defined(WIN32) || defined(WIN64)
+#include <string.h>
+#define strcasecmp stricmp
+#define strncasecmp strnicmp
+#else
+#include <unistd.h>
 #include <strings.h>
+#endif
 
 /* Needed to access various internal PNG chunk routines */
 #define PNG_INTERNAL
-#include <png.h>
+#include "pngpriv.h"
+#include "png.h"
 
 #ifdef __TURBOC__
 #include <mem.h>
 #endif
+
+
+#define PNGMETA_VERSION "1.8.14"
+
+
 
 /* defined so I can write to a file on gui/windowing platforms */
 /*  #define STDERR stderr  */
@@ -96,11 +109,17 @@ void print_finish PNGARG((FILE *fd, int output_type));
 void user_warning_fn PNGARG((png_structp png_ptr, png_const_charp warning_msg));
 
 
-const char *progname;
+static const char *progname;
 
 
 /* static - used to store magic RDF field if seen */
 static char *xmlrdf_magic_block=NULL;
+
+
+static int png_memcmpi(png_uint_32 a, png_uint_32 b, int l)
+{
+	return a == b;
+}
 
 
 /* read data, ignoring IDATs, till the end of the png file.
@@ -125,16 +144,16 @@ png_skip_till_end(png_structp png_ptr, png_infop info_ptr)
      length = png_get_uint_32(chunk_length);
 
      png_reset_crc(png_ptr);
-     png_crc_read(png_ptr, png_ptr->chunk_name, 4);
-   } while (!png_memcmp(png_ptr->chunk_name, png_IDAT, 4));
+     png_crc_read(png_ptr, (png_bytep)&png_ptr->chunk_name, 4);
+   } while (!png_memcmpi(png_ptr->chunk_name, png_IDAT, 4));
    
    png_ptr->mode |= PNG_AFTER_IDAT;
    
    do
    {
-     if (!png_memcmp(png_ptr->chunk_name, png_IHDR, 4))
+     if (!png_memcmpi(png_ptr->chunk_name, png_IHDR, 4))
        png_handle_IHDR(png_ptr, info_ptr, length);
-     else if (!png_memcmp(png_ptr->chunk_name, png_IDAT, 4))
+     else if (!png_memcmpi(png_ptr->chunk_name, png_IDAT, 4))
      {
        /* Zero length IDATs are legal after the last IDAT has been
         * read, but not after other chunks have been read.
@@ -145,34 +164,33 @@ png_skip_till_end(png_structp png_ptr, png_infop info_ptr)
          png_crc_finish(png_ptr, 0);
      }
 #if defined(PNG_READ_tIME_SUPPORTED)
-     else if (!png_memcmp(png_ptr->chunk_name, png_tIME, 4))
+     else if (!png_memcmpi(png_ptr->chunk_name, png_tIME, 4))
        png_handle_tIME(png_ptr, info_ptr, length);
 #endif
 #if defined(PNG_READ_tEXt_SUPPORTED)
-     else if (!png_memcmp(png_ptr->chunk_name, png_tEXt, 4))
+     else if (!png_memcmpi(png_ptr->chunk_name, png_tEXt, 4))
        png_handle_tEXt(png_ptr, info_ptr, length);
 #endif
 #if defined(PNG_READ_zTXt_SUPPORTED)
-     else if (!png_memcmp(png_ptr->chunk_name, png_zTXt, 4))
+     else if (!png_memcmpi(png_ptr->chunk_name, png_zTXt, 4))
        png_handle_zTXt(png_ptr, info_ptr, length);
 #endif
 #if defined(PNG_READ_iTXt_SUPPORTED)
-      else if (!png_memcmp(png_ptr->chunk_name, png_iTXt, 4))
+      else if (!png_memcmpi(png_ptr->chunk_name, png_iTXt, 4))
          png_handle_iTXt(png_ptr, info_ptr, length);
 #endif
-     else if (!png_memcmp(png_ptr->chunk_name, png_IEND, 4))
+     else if (!png_memcmpi(png_ptr->chunk_name, png_IEND, 4))
        png_handle_IEND(png_ptr, info_ptr, length);
      else
-       png_handle_unknown(png_ptr, info_ptr, length);
+       png_handle_unknown(png_ptr, info_ptr, length, PNG_HANDLE_CHUNK_AS_DEFAULT);
 
      if (!(png_ptr->mode & PNG_HAVE_IEND)) {
        png_read_data(png_ptr, chunk_length, 4);
        length = png_get_uint_32(chunk_length);
      
        png_reset_crc(png_ptr);
-       png_crc_read(png_ptr, png_ptr->chunk_name, 4);
+       png_crc_read(png_ptr, (png_bytep)&png_ptr->chunk_name, 4);
      }
-     
    } while (!(png_ptr->mode & PNG_HAVE_IEND));
 }
 
@@ -347,11 +365,11 @@ void print_finish(FILE *fd, int output_type)
 	break;
       
       case OUTPUT_HTML:
-	fprintf(fd, "<hr /><small>Created by %s V%s</small>\n\n</body>\n</html>\n", progname, VERSION);
+	fprintf(fd, "<hr /><small>Created by %s V%s</small>\n\n</body>\n</html>\n", progname, PNGMETA_VERSION);
 	break;
 	
       case OUTPUT_XRDF:
-        fprintf(fd, "</rdf:RDF>\n\n<!--Created by %s V%s -->\n", progname, VERSION);
+        fprintf(fd, "</rdf:RDF>\n\n<!--Created by %s V%s -->\n", progname, PNGMETA_VERSION);
         break;
         
       /* case OUTPUT_TEXT / default */
@@ -380,7 +398,12 @@ void user_warning_fn (png_structp png_ptr, png_const_charp warning_msg)
 
 
 /* MAIN BODY */
-int main(int argc, char *argv[])
+#if defined(BUILD_MONOLITHIC)
+#include "pngtools-monolithic.h"
+#define main(cnt, arr)      pngmeta_main(cnt, arr)
+#endif
+
+int main(int argc, const char** argv)
 {
   png_structp png_ptr;
   png_infop info_ptr;
@@ -397,7 +420,7 @@ int main(int argc, char *argv[])
   int version = 0;
   int i;
   char *p;
-  char *uri= NULL;
+  const char *uri= NULL;
 #ifdef HAVE_PNG_GET_TEXT
   png_textp text_ptr;
   int num_text = 0;
@@ -409,7 +432,8 @@ int main(int argc, char *argv[])
   progname = *argv++; argc--;
   if((p=strrchr(progname, '/'))) 
     progname=p+1;
-  
+  if ((p = strrchr(progname, '\\')))
+	  progname = p + 1;
   
   /* Automagically output SOIF when this program is called PngImage.sum */
   if(!strcmp(progname, "PngImage.sum"))
@@ -421,7 +445,7 @@ int main(int argc, char *argv[])
 
   
   while (*argv) {
-    char *arg=argv[0];
+    const char *arg=argv[0];
     int l=strlen(arg);
     
     if (*arg != '-')
@@ -444,7 +468,6 @@ int main(int argc, char *argv[])
       arg+=2;
     }
     
-
     if (!strcmp(arg, "soif")) {
       output_type = OUTPUT_SOIF;
     } else if (!strcmp(arg, "html")) {
@@ -496,15 +519,13 @@ int main(int argc, char *argv[])
     }
   } 
 
-
   if(usage) {
     fprintf(STDERR, "Try `%s --help' for more information\n", progname);
     exit(1);
   }
   
-  
   if (help || version) {
-    fprintf(STDERR, "%s %s (built with libpng %s and zlib %s)\n", progname, VERSION, PNG_LIBPNG_VER_STRING, ZLIB_VERSION);
+    fprintf(STDERR, "%s %s (built with libpng %s and zlib %s)\n", progname, PNGMETA_VERSION, PNG_LIBPNG_VER_STRING, ZLIBNG_VERSION);
     if (help) {
       fprintf(STDERR, "USAGE: %s [OPTIONS]... FILE\n", progname);
       fprintf(STDERR, "Display metadata information from a PNG image in FILE\n\n");
@@ -544,16 +565,14 @@ int main(int argc, char *argv[])
     fprintf(STDERR, "%s: libpng failed to create end info structure\n", progname);
     exit(1);
   }
-  
 
-  if (setjmp(png_ptr->jmpbuf))
+  if (setjmp(png_ptr->jmp_buf_local))
   {
     png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
     fprintf(STDERR, "%s: libpng read error for %s\n", progname, pngfile);
     fclose(in_fp);
     exit(1);
   }
-  
 
   /* Initialise data input */
   png_init_io(png_ptr, in_fp);
@@ -602,11 +621,18 @@ int main(int argc, char *argv[])
   /* Local function */
   png_skip_till_end(png_ptr, end_info);
 
-
-#ifdef HAVE_PNG_GET_TEXT
-  if(png_get_text(png_ptr, info_ptr, &text_ptr, &num_text) > 0) {
-    for (i = 0; i < num_text; i++)
-      print_kv(out_fp, output_type, text_ptr[i].key, text_ptr[i].text);
+#if 1 // HAVE_PNG_GET_TEXT
+  {
+	  png_textp text_ptr;
+	  int num_text;
+	  if (png_get_text(png_ptr, info_ptr, &text_ptr, &num_text) > 0) {
+		  for (i = 0; i < num_text; i++)
+			  print_kv(out_fp, output_type, text_ptr[i].key, text_ptr[i].text);
+	  }
+	  if (png_get_text(png_ptr, end_info, &text_ptr, &num_text) > 0) {
+		  for (i = 0; i < num_text; i++)
+			  print_kv(out_fp, output_type, text_ptr[i].key, text_ptr[i].text);
+	  }
   }
 #else
   /* Print text keywords before IDAT */
@@ -627,7 +653,6 @@ int main(int argc, char *argv[])
     print_kv(out_fp, output_type, "Modification Time",
              png_convert_to_rfc1123(png_ptr, &end_info->mod_time));
 
-
   print_end_image(out_fp, output_type);
 
   /* print rest of RDF/XML stuff */
@@ -637,9 +662,8 @@ int main(int argc, char *argv[])
 
   print_finish(out_fp, output_type);
   
-  
   /* Cleanup */
-  png_read_destroy(png_ptr, info_ptr, end_info);
+  png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
 
   fclose(in_fp);
   
