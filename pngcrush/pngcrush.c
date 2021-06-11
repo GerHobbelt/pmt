@@ -2240,7 +2240,6 @@ static png_infop read_info_ptr, write_info_ptr;
 static png_infop end_info_ptr;
 static png_infop write_end_info_ptr;
 static FILE *fpin, *fpout;
-png_uint_32 measure_idats(FILE * fp);
 #ifdef PNGCRUSH_LOCO
 static FILE *mng_out;
 static int do_loco = 0;
@@ -2248,7 +2247,6 @@ static int input_format = 0;    /* 0: PNG  1: MNG */
 static int output_format = 0;
 #endif
 static int do_color_count;
-png_uint_32 pngcrush_measure_idat(png_structp png_ptr);
 
 static png_uint_32 idat_length[MAX_METHODSP1];
 static int filter_type, zlib_level;
@@ -2308,7 +2306,7 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
 void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
-void pngcrush_write_png(png_structp write_pointer, png_bytep data,
+static void pngcrush_write_png(png_structp write_pointer, png_bytep data,
      png_size_t length);
 
 #ifdef PNG_USER_MEM_SUPPORTED
