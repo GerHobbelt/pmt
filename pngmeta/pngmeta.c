@@ -429,7 +429,8 @@ int main(int argc, const char** argv)
   /* Make progname just become the program name, not the full path -
      this is file system type specific since / is used as the
      separator */
-  progname = *argv++; argc--;
+  progname = *argv++;
+  argc--;
   if((p=strrchr(progname, '/'))) 
     progname=p+1;
   if ((p = strrchr(progname, '\\')))
@@ -444,14 +445,14 @@ int main(int argc, const char** argv)
     output_type = OUTPUT_XRDF;    
 
   
-  while (*argv) {
-    const char *arg=argv[0];
+  for (i = 0; i < argc; i++) {
+    const char *arg=argv[i];
     int l=strlen(arg);
     
     if (*arg != '-')
       break;
 
-    if(l < 2) {
+    if (l < 2) {
       usage=1;
       break;
     }
@@ -461,8 +462,7 @@ int main(int argc, const char** argv)
     } else {
       /* found '--' or equivalent */
       if (l==2) {
-        argv++;
-        argc--;
+        i++;
         break;
       }
       arg+=2;
@@ -485,33 +485,30 @@ int main(int argc, const char** argv)
       version = 1;
       break;
     } else if (!strcmp(arg, "uri")) {
-      argv++;
-      argc--;
-      if (!argc) {
+		i++;
+      if (i >= argc) {
         fprintf(STDERR, "%s: option --uri requires an argument\n", progname);
         usage=1;
       } else {
-        uri=*argv;
+        uri=argv[i];
       }
     } else {
       fprintf(STDERR, "%s: invalid option -- %s\n", progname, arg);
       usage = 1;
       break;
     }
-    argv++;
-    argc--;
   }
 
   if (!usage && !help && !version) {
-    if (!argc)
+    if (i == argc)
       /* nop */;
-    else if (argc == 1) {
-      pngfile = *argv;
+    else if (argc == i + 1) {
+      pngfile = argv[i];
       if (!(in_fp = fopen (pngfile, "rb"))) {
 	fprintf(STDERR, "%s: Could not open input file %s - ", progname, pngfile);
 	fflush(STDERR);
 	perror(NULL);
-	exit(1);
+	return EXIT_FAILURE;
       }
       usingfile = 1;
     } else {
@@ -521,7 +518,7 @@ int main(int argc, const char** argv)
 
   if(usage) {
     fprintf(STDERR, "Try `%s --help' for more information\n", progname);
-    exit(1);
+    return EXIT_FAILURE;
   }
   
   if (help || version) {
@@ -539,14 +536,14 @@ int main(int argc, const char** argv)
       fprintf(STDERR, "  --version      output version information and exit\n");
       fprintf(STDERR, "\nCopyright 1998-2000 Dave Beckett, ILRT, University of Bristol\nhttp://purl.org/net/dajobe/\n");
     }
-    exit(1);
+    return EXIT_FAILURE;
   }
 
   png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
                                    (void*)NULL, NULL, user_warning_fn);
   if (!png_ptr) {
     fprintf(STDERR, "%s: libpng failed to create read structure\n", progname);
-    exit(1);
+    return EXIT_FAILURE;
   }
 
   info_ptr = png_create_info_struct(png_ptr);
@@ -554,7 +551,7 @@ int main(int argc, const char** argv)
   {
     png_destroy_read_struct(&png_ptr, (png_infopp)NULL, (png_infopp)NULL);
     fprintf(STDERR, "%s: libpng failed to create info structure\n", progname);
-    exit(1);
+    return EXIT_FAILURE;
   }
 
   /* This is necessary to zero text pointers */
@@ -563,7 +560,7 @@ int main(int argc, const char** argv)
   {
     png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
     fprintf(STDERR, "%s: libpng failed to create end info structure\n", progname);
-    exit(1);
+    return EXIT_FAILURE;
   }
 
   if (setjmp(png_ptr->jmp_buf_local))
@@ -571,7 +568,7 @@ int main(int argc, const char** argv)
     png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
     fprintf(STDERR, "%s: libpng read error for %s\n", progname, pngfile);
     fclose(in_fp);
-    exit(1);
+    return EXIT_FAILURE;
   }
 
   /* Initialise data input */
@@ -625,6 +622,7 @@ int main(int argc, const char** argv)
   {
 	  png_textp text_ptr;
 	  int num_text;
+	  int i;
 	  if (png_get_text(png_ptr, info_ptr, &text_ptr, &num_text) > 0) {
 		  for (i = 0; i < num_text; i++)
 			  print_kv(out_fp, output_type, text_ptr[i].key, text_ptr[i].text);
@@ -635,14 +633,16 @@ int main(int argc, const char** argv)
 	  }
   }
 #else
-  /* Print text keywords before IDAT */
-  for (i = 0; i < info_ptr->num_text; i++)
-    print_kv(out_fp, output_type, info_ptr->text[i].key, info_ptr->text[i].text);
-  
-  /* Print text keywords after IDAT */
-  for (i = 0; i < end_info->num_text; i++)
-    print_kv(out_fp, output_type, end_info->text[i].key, end_info->text[i].text);
-    
+  {
+	  int i;
+	  /* Print text keywords before IDAT */
+	  for (i = 0; i < info_ptr->num_text; i++)
+		  print_kv(out_fp, output_type, info_ptr->text[i].key, info_ptr->text[i].text);
+
+	  /* Print text keywords after IDAT */
+	  for (i = 0; i < end_info->num_text; i++)
+		  print_kv(out_fp, output_type, end_info->text[i].key, end_info->text[i].text);
+  }
 #endif
   
   /* Print modification time (tIME chunk) if present */
@@ -667,5 +667,5 @@ int main(int argc, const char** argv)
 
   fclose(in_fp);
   
-  exit (0);
+  return EXIT_SUCCESS;
 }
