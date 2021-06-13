@@ -4307,6 +4307,11 @@ int main(int argc, const char** argv)
     if (verbose > 0 && printed_version_info == 0)
         print_version_info();
 
+    if (argc == 1)
+    {
+        print_usage(1);   /* this exits */
+    }
+
     if (default_compression_window == 32)
         default_compression_window = 15;
     else if (default_compression_window == 16)
@@ -4342,8 +4347,15 @@ int main(int argc, const char** argv)
 
         else if (overwrite)
         {
-            inname = argv[names];
-        }
+			if (argc > names)
+			{
+				inname = argv[names];
+			}
+			else
+			{
+				print_usage(1);   /* this exits */
+			}
+		}
 
         else
         {
@@ -4400,7 +4412,14 @@ int main(int argc, const char** argv)
         image_specified_gamma = 0;
         intent=specified_intent;
         
-        inname = argv[names++];
+		if (argc > names)
+		{
+			inname = argv[names++];
+		}
+		else
+		{
+			inname = NULL;
+		}
 
         if (inname == NULL)
         {
