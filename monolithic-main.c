@@ -1,18 +1,18 @@
 
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "pngtools-monolithic.h"
 
-int main(int argc, const char** argv)
-{
-	pngcrush_main(argc, argv);
-	pngmeta_main(argc, argv);
+#define USAGE_NAME   "png-pmt-tools"
 
-	pngzop_zlib_to_idat_main(argc, argv);
-	pngidat_main(argc, argv);
-	pngiend_main(argc, argv);
-	pngihdr_main(argc, argv);
+#include "monolithic_main_internal_defs.h"
 
-	return 0;
-}
+// declare your own monolith dispatch table:
+MONOLITHIC_CMD_TABLE_START()
+	{ "pngcrush", {.fa = pngcrush_main } },
+	{ "pngmeta", {.fa = pngmeta_main } },
+	{ "zlib_to_idat", {.fa = pngzop_zlib_to_idat_main } },
+	{ "pngidat", {.fa = pngidat_main } },
+	{ "pngiend", {.fa = pngiend_main } },
+	{ "pngihdr", {.fa = pngihdr_main } },
+MONOLITHIC_CMD_TABLE_END();
+
+#include "monolithic_main_tpl.h"
