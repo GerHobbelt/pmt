@@ -5286,7 +5286,8 @@ int main(int argc, const char** argv)
                 pngcrush_pause();
 
 #ifdef PNG_CRC_QUIET_USE
-                if (check_crc == 0)
+# ifdef PNG_IGNORE_ADLER32
+								if (check_crc == 0)
                 {
                     /* We don't need to check IDAT CRC's and ADLER32 because
                      * they were already checked in the pngcrush_measure_idat
@@ -5297,6 +5298,7 @@ int main(int argc, const char** argv)
                     png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
                                        PNG_CRC_QUIET_USE);
                 }
+# endif
 #endif
 
 #ifndef PNGCRUSH_CHECK_ADLER32
