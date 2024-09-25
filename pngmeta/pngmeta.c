@@ -602,10 +602,10 @@ int main(int argc, const char** argv)
     sprintf(value, "%d", info_ptr->bit_depth);
     print_kv(out_fp, output_type, "image-colors", value);
     
-    sprintf(value, "%ld", info_ptr->width);
+    sprintf(value, "%ld", (long)info_ptr->width);
     print_kv(out_fp, output_type, "image-width", value);
     
-    sprintf(value, "%ld", info_ptr->height);
+    sprintf(value, "%ld", (long)info_ptr->height);
     print_kv(out_fp, output_type, "image-height", value);
     
     sprintf(value, "%s, %sinterlaced",
