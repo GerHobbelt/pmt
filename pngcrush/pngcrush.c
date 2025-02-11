@@ -2310,7 +2310,7 @@ static void pngcrush_write_png(png_structp write_pointer, png_bytep data,
      png_size_t length);
 
 #ifdef PNG_USER_MEM_SUPPORTED
-png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_uint_32 size);
+png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_size_t size);
 void pngcrush_debug_free(png_structp png_ptr, png_voidp ptr);
 #endif
 
@@ -2501,7 +2501,7 @@ static int current_allocation = 0;
 static int maximum_allocation = 0;
 
 
-png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_uint_32 size)
+png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_size_t size)
 {
 
     /*
@@ -4606,16 +4606,16 @@ int main(int argc, const char** argv)
 #  ifdef PNG_USER_MEM_SUPPORTED
                if (verbose > 0)
                   mng_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING,
-                    (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
-                    (png_error_ptr) pngcrush_warning, (png_voidp) NULL, 
-                    (png_malloc_ptr) pngcrush_debug_malloc,
-                    (png_free_ptr) pngcrush_debug_free);
+                    (png_voidp) NULL, pngcrush_cexcept_error,
+                    pngcrush_warning, (png_voidp) NULL, 
+                    pngcrush_debug_malloc,
+                    pngcrush_debug_free);
                else
 #  endif
                   mng_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
                     (png_voidp) NULL,
-                    (png_error_ptr) pngcrush_cexcept_error,
-                    (png_error_ptr) pngcrush_warning);
+                    pngcrush_cexcept_error,
+                    pngcrush_warning);
                if (mng_ptr == NULL)
                   fprintf(STDERR, "pngcrush could not create mng_ptr");
 
@@ -4630,7 +4630,7 @@ int main(int argc, const char** argv)
                number_of_open_files++;
                png_init_io(mng_ptr, mng_out);
                png_set_write_fn(mng_ptr, (png_voidp) mng_out,
-                                (png_rw_ptr) pngcrush_write_png,
+                                pngcrush_write_png,
                                 pngcrush_flush);
             }
 #endif /* PNGCRUSH_LOCO */
@@ -5147,17 +5147,17 @@ int main(int argc, const char** argv)
                 if (verbose > 0)
                    read_ptr = png_create_read_struct_2(PNG_LIBPNG_VER_STRING,
                      (png_voidp) NULL,
-                     (png_error_ptr) pngcrush_cexcept_error,
-                     (png_error_ptr) pngcrush_warning,
+                     pngcrush_cexcept_error,
+                     pngcrush_warning,
                      (png_voidp) NULL,
-                     (png_malloc_ptr) pngcrush_debug_malloc,
-                     (png_free_ptr) pngcrush_debug_free);
+                     pngcrush_debug_malloc,
+                     pngcrush_debug_free);
                 else
 #endif /* PNG_USER_MEM_SUPPORTED */
                    read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
                      (png_voidp) NULL,
-                     (png_error_ptr) pngcrush_cexcept_error,
-                     (png_error_ptr) pngcrush_warning);
+                     pngcrush_cexcept_error,
+                     pngcrush_warning);
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
 
@@ -5229,17 +5229,17 @@ int main(int argc, const char** argv)
                        write_ptr = png_create_write_struct_2(
                          PNG_LIBPNG_VER_STRING,
                          (png_voidp) NULL,
-                         (png_error_ptr) pngcrush_cexcept_error,
-                         (png_error_ptr) pngcrush_warning,
+                         pngcrush_cexcept_error,
+                         pngcrush_warning,
                          (png_voidp) NULL,
-                         (png_malloc_ptr) pngcrush_debug_malloc,
-                         (png_free_ptr) pngcrush_debug_free);
+                         pngcrush_debug_malloc,
+                         pngcrush_debug_free);
                     else
 #endif
                        write_ptr = png_create_write_struct(
                          PNG_LIBPNG_VER_STRING,
                          (png_voidp) NULL,
-                         (png_error_ptr) pngcrush_cexcept_error,
+                         pngcrush_cexcept_error,
                          (png_error_ptr) NULL);
                     if (write_ptr == NULL)
                         Throw "pngcrush could not create write_ptr";
@@ -5280,7 +5280,7 @@ int main(int argc, const char** argv)
 
                 if (nosave == 0)
                     png_set_write_fn(write_ptr, (png_voidp) fpout,
-                        (png_rw_ptr) pngcrush_write_png, pngcrush_flush);
+                        pngcrush_write_png, pngcrush_flush);
 
                 P2("io has been initialized.\n");
                 pngcrush_pause();
